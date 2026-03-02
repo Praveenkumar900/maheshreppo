@@ -1,0 +1,54 @@
+trigger:
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  MAVEN_OPTS: '-Xmx1024m'
+
+stages:
+
+# ===============================
+# Stage 1: Build & Lint
+# ===============================
+- stage: Build
+  displayName: "Build, Lint and Test"
+  jobs:
+  - job: MavenBuild
+    steps:
+
+    - task: Maven@3
+      displayName: "Maven Clean Verify (Build + Lint + Test)"
+      inputs:
+        mavenPomFile: 'pom.xml'
+        goals: 'clean verify'
+        options: '-DskipTests=false'
+        publishJUnitResults: true
+        testResultsFiles: '**/surefire-reports/TEST-*.xml'
+        javaHomeOption: 'JDKVersion'
+        jdkVersionOption: '1.11'
+        mavenVersionOption: 'Default'
+
+# ===============================
+# Stage 2: Publish Artifact to Nexus
+# ===============================
+- stage: Publish
+  displayName: "Deploy to Nexus"
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - job: Deploy
+    steps:
+
+    - task: Maven@3
+      displayName: "Maven Deploy to Nexus"
+      inputs:
+        mavenPomFile: 'pom.xml'
+        goals: 'deploy'
+        options: >
+          -DskipTests
+          -Dnexus.username=$(NEXUS_USERNAME)
+          -Dnexus.password=$(NEXUS_PASSWORD)
+        javaHomeOption: 'JDKVersion'
+        jdkVersionOption: '1.11'
